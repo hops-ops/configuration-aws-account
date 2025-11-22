@@ -1,0 +1,108 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: accounts.aws.hops.ops.com.ai
+spec:
+  scope: Namespaced
+  group: aws.hops.ops.com.ai
+  names:
+    kind: Account
+    plural: accounts
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        required:
+        - spec
+        properties:
+          spec:
+            type: object
+            required:
+            - parameters
+            properties:
+              managementMode:
+                type: string
+                description: Controls whether Hops operates the account (managed) or hands it over (self).
+                enum:
+                - self
+                - managed
+                default: self
+              managementPolicies:
+                type: array
+                description: Crossplane management policies propagated to managed resources. Defaults to ["*"].
+                items:
+                  type: string
+                  enum:
+                  - "*"
+                  - Create
+                  - Observe
+                  - Update
+                  - Delete
+                  - LateInitialize
+                default:
+                - "*"
+              providerConfigName:
+                type: string
+                description: Root AWS ProviderConfig used for Organizations operations. Defaults to default.
+                default: default
+              parameters:
+                type: object
+                required:
+                - name
+                - emailPrefix
+                - ouPath
+                properties:
+                  name:
+                    type: string
+                    description: Friendly AWS account display name.
+                  emailPrefix:
+                    type: string
+                    description: Prefix used to build the AWS account email address.
+                  emailDomain:
+                    type: string
+                    description: Domain appended to emailPrefix. Defaults to example.com.
+                  email:
+                    type: string
+                    description: Optional full email override. Bypasses prefix + domain logic when set.
+                  ouPath:
+                    type: string
+                    description: Desired Organizational Unit path (e.g., root/workloads/prod/account).
+                  parentId:
+                    type: string
+                    description: Optional OU ID override. When set, the composition skips OU creation and places the account directly into this parent.
+                  environment:
+                    type: string
+                    description: Environment label used for feature toggles.
+                    enum:
+                    - root
+                    - sandbox
+                    - dev
+                    - prod
+                    - tenant
+                    - testing
+                    default: dev
+                  tags:
+                    type: object
+                    description: "Additional AWS tags merged with the default {\"hops\": \"true\"} set."
+                    x-kubernetes-preserve-unknown-fields: true
+                  policyAttachments:
+                    type: array
+                    description: Optional list of Service Control Policy ARNs to attach once the account is created.
+                    items:
+                      type: string
+          status:
+            type: object
+            properties:
+              accountId:
+                type: string
+              orgId:
+                type: string
+              adminRoleArn:
+                type: string
+              providerConfigName:
+                type: string
+              ready:
+                type: boolean

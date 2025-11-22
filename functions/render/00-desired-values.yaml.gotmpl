@@ -1,0 +1,71 @@
+# code: language=yaml
+# yaml-language-server: $schema=../../.up/json/models/index.schema.json
+
+{{ $xr := getCompositeResource . }}
+{{ $metadata := $xr.metadata | default (dict) }}
+{{ $spec := $xr.spec | default (dict) }}
+{{ $parameters := $spec.parameters | default (dict) }}
+
+{{ $name := $metadata.name | default "" }}
+{{ $namespace := $metadata.namespace | default "" }}
+
+{{ $managementMode := $spec.managementMode | default "self" }}
+{{ $managementPolicies := $spec.managementPolicies | default (list "*") }}
+{{ $providerConfigName := $spec.providerConfigName | default "default" }}
+
+{{ $environment := $parameters.environment | default "dev" }}
+{{ $accountDisplayName := $parameters.name | default $name }}
+{{ $emailPrefix := $parameters.emailPrefix | default $name }}
+{{ $emailDomain := $parameters.emailDomain | default "example.com" }}
+{{ $emailOverride := $parameters.email | default "" }}
+{{ $accountEmail := $emailOverride | default (printf "%s@%s" $emailPrefix $emailDomain) }}
+
+{{ $defaultTags := dict "hops" "true" }}
+{{ $accountTags := merge $defaultTags ($parameters.tags | default (dict)) }}
+
+{{ $requestedOuPath := $parameters.ouPath | default "root" }}
+{{ $parentIdOverride := $parameters.parentId | default "" }}
+{{ $isRootPath := eq (lower $requestedOuPath) "root" }}
+
+{{ $rawOuSegments := splitList "/" $requestedOuPath }}
+{{ $normalizedOuSegments := list }}
+{{ range $rawOuSegments }}
+  {{- $segment := trim . }}
+  {{- if $segment }}
+    {{- $normalizedOuSegments = append $normalizedOuSegments $segment }}
+  {{- end }}
+{{ end }}
+
+{{ $ouSegments := list }}
+{{ range $index, $segment := $normalizedOuSegments }}
+  {{- if and (eq $index 0) (eq (lower $segment) "root") }}
+  {{- else }}
+    {{- $ouSegments = append $ouSegments $segment }}
+  {{- end }}
+{{ end }}
+
+{{ if $parentIdOverride }}
+  {{ $ouSegments = list }}
+{{ end }}
+
+{{ $ouDescriptors := list }}
+{{ range $index, $segment := $ouSegments }}
+  {{- $segmentSlug := regexReplaceAll "[^a-z0-9-]" (lower $segment) "-" }}
+  {{- $resourceKey := printf "organizational-unit-%d" $index }}
+  {{- $resourceName := printf "%s-ou-%s-%d" $name $segmentSlug $index }}
+  {{- $descriptor := dict
+      "index" $index
+      "segment" $segment
+      "slug" $segmentSlug
+      "resourceKey" $resourceKey
+      "resourceName" $resourceName
+    }}
+  {{- $ouDescriptors = append $ouDescriptors $descriptor }}
+{{ end }}
+
+{{ $organizationResourceName := printf "%s-organization" $name }}
+{{ $accountResourceName := printf "%s-account" $name }}
+{{ $accountProviderConfigName := printf "%s-provider" $name }}
+
+{{ $policyAttachments := $parameters.policyAttachments | default (list) }}
+{{ $accountAdminRoleName := "OrganizationAccountAccessRole" }}

@@ -1,0 +1,26 @@
+# code: language=yaml
+# yaml-language-server: $schema=../../.up/json/models/index.schema.json
+
+{{ if and $accountReady $accountId }}
+  {{- range $index, $policyArn := $policyAttachments }}
+
+---
+
+apiVersion: organizations.aws.m.upbound.io/v1beta1
+kind: PolicyAttachment
+metadata:
+  name: {{ printf "%s-scp-%d" $name $index }}
+  namespace: {{ $namespace }}
+  annotations:
+    gotemplating.fn.crossplane.io/composition-resource-name: {{ printf "policy-attachment-%d" $index | quote }}
+spec:
+  managementPolicies: {{ toYaml $managementPolicies | nindent 4 }}
+  providerConfigRef:
+    kind: ProviderConfig
+    name: {{ $providerConfigName }}
+  forProvider:
+    policyArn: {{ $policyArn }}
+    targetId: {{ $accountId }}
+
+  {{- end }}
+{{ end }}

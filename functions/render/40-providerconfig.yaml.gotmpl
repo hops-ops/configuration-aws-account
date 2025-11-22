@@ -1,0 +1,21 @@
+# code: language=yaml
+# yaml-language-server: $schema=../../.up/json/models/index.schema.json
+
+{{ if $accountReady }}
+
+---
+
+apiVersion: aws.m.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: {{ $accountProviderConfigName }}
+  namespace: {{ $namespace }}
+  annotations:
+    gotemplating.fn.crossplane.io/composition-resource-name: "account-providerconfig"
+spec:
+  credentials:
+    source: IRSA
+  assumeRoleChain:
+    - roleARN: {{ printf "arn:aws:iam::%s:role/%s" $accountId $accountAdminRoleName }}
+
+{{ end }}

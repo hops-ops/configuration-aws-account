@@ -1,0 +1,31 @@
+# code: language=yaml
+# yaml-language-server: $schema=../../.up/json/models/index.schema.json
+
+{{ if and (or $parentIdOverride $accountParentReady) (or $parentIdOverride $accountParentId) }}
+
+---
+
+apiVersion: organizations.aws.m.upbound.io/v1beta1
+kind: Account
+metadata:
+  name: {{ $accountResourceName }}
+  namespace: {{ $namespace }}
+  annotations:
+    gotemplating.fn.crossplane.io/composition-resource-name: "member-account"
+spec:
+  managementPolicies: {{ toYaml $managementPolicies | nindent 4 }}
+  providerConfigRef:
+    kind: ProviderConfig
+    name: {{ $providerConfigName }}
+  forProvider:
+    name: {{ $accountDisplayName }}
+    email: {{ $accountEmail }}
+    parentId: {{ $parentIdOverride | default $accountParentId }}
+    {{- if $accountTags }}
+    tags:
+      {{- range $k, $v := $accountTags }}
+      {{ $k }}: {{ quote $v }}
+      {{- end }}
+    {{- end }}
+
+{{ end }}

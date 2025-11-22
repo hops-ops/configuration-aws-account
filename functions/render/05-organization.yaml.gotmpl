@@ -1,0 +1,24 @@
+# code: language=yaml
+# yaml-language-server: $schema=../../.up/json/models/index.schema.json
+
+{{ $organizationManagementPolicies := $managementPolicies }}
+{{ if not $isRootPath }}
+  {{ $organizationManagementPolicies = list "Observe" "LateInitialize" }}
+{{ end }}
+
+---
+
+apiVersion: organizations.aws.m.upbound.io/v1beta1
+kind: Organization
+metadata:
+  name: {{ $organizationResourceName }}
+  namespace: {{ $namespace }}
+  annotations:
+    gotemplating.fn.crossplane.io/composition-resource-name: "organization"
+spec:
+  managementPolicies: {{ toYaml $organizationManagementPolicies | nindent 4 }}
+  providerConfigRef:
+    kind: ProviderConfig
+    name: {{ $providerConfigName }}
+  forProvider:
+    featureSet: ALL

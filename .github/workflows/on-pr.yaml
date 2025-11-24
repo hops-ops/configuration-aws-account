@@ -22,8 +22,8 @@ jobs:
     with:
       examples: |
         [
-          { "path": "examples/accounts/example.yaml" },
-          { "path": "examples/accounts/example.yaml", "observed_resources": "examples/observed-resources/step-1" }
+          { "example": "examples/accounts/example.yaml" },
+          { "example": "examples/accounts/example.yaml", "observed_resources": "examples/observed-resources/step-1" }
         ]
       api_path: apis/accounts
       error_on_missing_schemas: true

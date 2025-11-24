@@ -18,14 +18,14 @@ permissions:
 
 jobs:
   validate:
-    uses: unbounded-tech/workflows-crossplane/.github/workflows/validate.yaml@v0.8.0
+    uses: unbounded-tech/workflows-crossplane/.github/workflows/validate.yaml@feat/validate-observed-resources
     with:
       examples: |
         [
-          "examples/irsas/example.yaml",
-          "examples/irsas/example-minimal.yaml"
+          { "path": "examples/accounts/example.yaml" },
+          { "path": "examples/accounts/example.yaml", "observed_resources": "examples/observed-resources/step-1" },
         ]
-      api_path: apis/irsas
+      api_path: apis/accounts
       error_on_missing_schemas: true
 
   test:

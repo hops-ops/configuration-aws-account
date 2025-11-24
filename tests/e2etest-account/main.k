@@ -2,7 +2,7 @@ import base64
 import datetime
 import file
 import math
-import models.ai.com.ops.hops.aws.v1alpha1 as awsv1alpha1
+import models.ai.com.ops.hops.aws.v1alpha1 as hops
 import models.io.upbound.dev.meta.v1alpha1 as metav1alpha1
 
 _now = str(int(math.floor(datetime.ticks())))
@@ -21,7 +21,7 @@ _items = [
             crossplane.autoUpgrade.channel: "Rapid"
             defaultConditions: ["Ready"]
             manifests: [
-                awsv1alpha1.Account{
+                hops.Account{
                     metadata: {
                         name: _composite_name
                         namespace: "default"

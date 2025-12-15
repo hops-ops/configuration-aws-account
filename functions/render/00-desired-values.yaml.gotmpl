@@ -12,3 +12,4 @@
 {{ $policyAttachments := $spec.policyAttachments | default (list) }}
 {{ $defaultTags := dict "hops" "true" }}
 {{ $tags := merge $defaultTags ($spec.tags | default (dict)) }}
+{{ $accountForProvider := $spec.forProvider | default (dict) }}

@@ -23,4 +23,7 @@ spec:
     email: {{ $email }}
     parentId: {{ $parentId }}
     tags: {{ toYaml $tags | nindent 6 }}
+    {{- with $accountForProvider }}
+    {{ toYaml . | nindent 4 }}
+    {{- end }}
 {{ end }}

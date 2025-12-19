@@ -1,79 +1,168 @@
 # configuration-aws-account
 
-Crossplane configuration for AWS Organizations member accounts. Creates accounts and attaches SCPs.
+Create and manage individual AWS Organizations member accounts. This is a low-level building block - most users should use the Organization XRD with inline accounts instead.
 
-## Spec
+## When to Use This Directly
+
+**Use Organization XRD (recommended):**
+- Creating accounts as part of your org hierarchy
+- Want accounts placed in specific OUs automatically
+- Managing multiple accounts together
+
+**Use Account XRD directly:**
+- Creating accounts outside the Organization XRD
+- Advanced scenarios requiring per-account control
+- Programmatic account vending (account factory)
+
+## How It Works
+
+When you create an account via AWS Organizations:
+1. AWS creates the account with the specified email
+2. AWS automatically creates `OrganizationAccountAccessRole` in the new account
+3. This role trusts the management account, enabling cross-account access
+4. You can assume this role to manage resources in the new account
+
+## Basic Usage
 
 ```yaml
 apiVersion: aws.hops.ops.com.ai/v1alpha1
 kind: Account
 metadata:
   name: team-platform-dev
-  namespace: hops
+  namespace: default
 spec:
-  email: platform-dev@mycompany.com     # required: unique AWS account email
-  parentId: r-1234                      # required: Organizations root or OU ID
-  providerConfigName: management-aws    # optional: management account ProviderConfig (default: "default")
-  policyAttachments:                    # optional: list of SCP ARNs
-    - arn:aws:organizations::111111111111:policy/o-example/p-deny-root
-  tags:                                 # optional: AWS tags (automatically includes "hops: true")
+  email: platform-dev@acme.example.com  # Must be unique across all AWS
+  parentId: ou-abc1-workloads           # OU ID or root ID (r-xxxx)
+  providerConfigName: management        # Management account ProviderConfig
+  managementPolicies: ["*"]
+
+  tags:
     team: platform
     environment: dev
 ```
 
+## Import Existing Account
+
+Already have an account? Import it with `externalName`:
+
+```yaml
+apiVersion: aws.hops.ops.com.ai/v1alpha1
+kind: Account
+metadata:
+  name: legacy-prod
+  namespace: default
+spec:
+  externalName: "123456789012"  # Existing account ID
+  email: legacy-prod@acme.example.com
+  parentId: ou-abc1-prod
+  providerConfigName: management
+  # Don't delete if removed from Crossplane
+  managementPolicies: ["Create", "Observe", "Update", "LateInitialize"]
+```
+
+## Attach Service Control Policies
+
+SCPs restrict what actions accounts can perform - use them for guardrails:
+
+```yaml
+apiVersion: aws.hops.ops.com.ai/v1alpha1
+kind: Account
+metadata:
+  name: team-sandbox
+  namespace: default
+spec:
+  email: sandbox@acme.example.com
+  parentId: ou-abc1-sandbox
+  providerConfigName: management
+
+  # Attach SCPs for guardrails
+  policyAttachments:
+    - arn:aws:organizations::111111111111:policy/o-abc123/service_control_policy/p-deny-root
+    - arn:aws:organizations::111111111111:policy/o-abc123/service_control_policy/p-region-restrict
+
+  tags:
+    environment: sandbox
+    cost-center: engineering
+```
+
 ## Status
+
+The Account exposes the information needed for cross-account access:
 
 ```yaml
 status:
   accountId: "123456789012"
-  organizationAccountAccessRoleArn: "arn:aws:iam::123456789012:role/OrganizationAccountAccessRole"
+  organizationAccountAccessRoleArn: arn:aws:iam::123456789012:role/OrganizationAccountAccessRole
   ready: true
 ```
 
 ## Cross-Account Access
 
-To manage resources in the new account, create a ProviderConfig that assumes the `OrganizationAccountAccessRole`:
+Create a ProviderConfig that assumes the `OrganizationAccountAccessRole`:
 
 ```yaml
-apiVersion: aws.upbound.io/v1beta1
+apiVersion: aws.m.upbound.io/v1beta1
 kind: ProviderConfig
 metadata:
   name: team-platform-dev
 spec:
-  credentials:
-    source: PodIdentity
   assumeRoleChain:
     - roleARN: arn:aws:iam::123456789012:role/OrganizationAccountAccessRole
+  credentials:
+    source: PodIdentity  # Or Secret, IRSA
 ```
 
-Then reference it in other resources:
+Then reference it in resources:
 
 ```yaml
+apiVersion: s3.aws.m.upbound.io/v1beta1
+kind: Bucket
 spec:
   providerConfigRef:
-    name: team-platform-dev
+    name: team-platform-dev  # Creates bucket in the team's account
+  forProvider:
+    region: us-east-1
 ```
 
-## Dependencies
+## Account Factory Pattern
 
-This configuration depends on the following Crossplane packages (see `apis/accounts/configuration.yaml` for exact versions):
+For programmatic account creation, you can template Account resources:
 
-- `provider-aws-organizations`
-- `provider-aws-iam`
-- `provider-aws-iamidentitycenter` (for future integrations)
-- `provider-aws-ram` (for sharing)
-- `function-auto-ready`
+```yaml
+# Create accounts from a list
+{{ range $team := .teams }}
+---
+apiVersion: aws.hops.ops.com.ai/v1alpha1
+kind: Account
+metadata:
+  name: {{ $team.name }}-{{ $team.environment }}
+  namespace: default
+spec:
+  email: {{ $team.name }}-{{ $team.environment }}@acme.example.com
+  parentId: {{ if eq $team.environment "prod" }}ou-abc1-prod{{ else }}ou-abc1-nonprod{{ end }}
+  providerConfigName: management
+  tags:
+    team: {{ $team.name }}
+    environment: {{ $team.environment }}
+{{ end }}
+```
 
-## Examples
+## Recommendations
 
-See `examples/accounts/example.yaml` for a ready-to-render member account spec. Run `make render-example` to render the example.
+1. **Use Organization XRD for most cases** - It handles OU placement and keeps your hierarchy visible
+2. **Always set tags** - Include team, environment, and cost-center for billing
+3. **Use unique emails** - AWS requires globally unique emails; use `+` addressing if needed (aws+prod@acme.com)
+4. **Don't delete production accounts** - Use `managementPolicies` without Delete to orphan on removal
+5. **Account deletion takes 90 days** - AWS Organizations account closure is not immediate
 
 ## Development
 
-| Command            | Description                                       |
-|--------------------|---------------------------------------------------|
-| `make render-example` | Runs `up composition render` for the default example |
-| `make validate`    | Validates the XRD + examples with `up xrd validate`    |
-| `make test`        | Executes all `up test run tests/*` suites          |
+```bash
+make render              # Render example
+make test                # Run tests
+make validate            # Validate compositions
+```
 
-Variables are hoisted in `functions/render/00-desired-values.yaml.gotmpl`. The composition follows the standard Hops pattern with desired values, observed resources (for status projection), and conditional resource rendering based on readiness.
+## License
+
+Apache-2.0

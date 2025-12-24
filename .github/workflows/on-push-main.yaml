@@ -27,7 +27,7 @@ jobs:
       examples: |
         [
           { "example": "examples/accounts/standard.yaml" },
-          { "example": "examples/accounts/standard.yaml", "observed_resources": "examples/observed-resources/standard/steps/1" },
+          { "example": "examples/accounts/standard.yaml", "observed_resources": "examples/test/mocks/observed-resources/standard/steps/1" },
           { "example": "examples/accounts/import.yaml" }
         ]
       api_path: apis/accounts
